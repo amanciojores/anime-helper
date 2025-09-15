@@ -3,7 +3,7 @@
  * A professional-grade toolkit for the Anime.js library (v4+ compliant).
  * This class provides a high-level, declarative API for creating complex, scroll-triggered,
  * and interactive web animations with a strong focus on performance and ease of use.
- * @version 5.6 (Production Ready) - Added auto-refresh on window.load for stability.
+ * @version 5.6 (Production Ready) - Final stability patches and auto-refresh.
  * @license MIT
  */
 class AnimeHelper {
@@ -762,7 +762,17 @@ class AnimeHelper {
   _updatePinSpacer(el, data) {
     Object.assign(el.style, data.scroll.originalStyles);
     const rect = el.getBoundingClientRect();
-    data.scroll.pinSpacer.style.height = `${rect.height}px`;
+    const computedStyle = getComputedStyle(el);
+
+    Object.assign(data.scroll.pinSpacer.style, {
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+      marginTop: computedStyle.marginTop,
+      marginBottom: computedStyle.marginBottom,
+      marginLeft: computedStyle.marginLeft,
+      marginRight: computedStyle.marginRight,
+    });
+
     Object.assign(el.style, {
       position: "absolute",
       top: "0",
