@@ -3,21 +3,31 @@
  * A professional-grade toolkit for the Anime.js library (v4+ compliant).
  * This class provides a high-level, declarative API for creating complex, scroll-triggered,
  * and interactive web animations with a strong focus on performance and ease of use.
- *
- * @version 5.5 (Production Ready)
+ * @version 5.6 (Production Ready) - Added auto-refresh on window.load for stability.
  * @license MIT
- * @author Jores Amancio & Gemini Collaboration
  */
 class AnimeHelper {
   // --- STATIC PROPERTIES & METHODS (Anime.js v4+) ---
+
+  /**
+   * @private
+   * @static
+   * @property {AnimeHelper[]} _instances - Tracks all active instances of the AnimeHelper class for global controls.
+   */
   static _instances = [];
+  /**
+   * @private
+   * @static
+   * @property {Object.<string, function>} _presets - Stores custom animation presets added via `addPreset`.
+   */
   static _presets = {};
 
   /**
-   * Creates a standard "to" animation.
+   * Creates a standard "to" animation. A static shorthand for `anime.animate()`.
+   * @static
    * @param {string|HTMLElement|NodeList} targets - The element(s) to animate.
-   * @param {object} params - The Anime.js parameters.
-   * @returns {object} The Anime.js instance.
+   * @param {object} params - The Anime.js parameters object.
+   * @returns {object} The Anime.js animation instance.
    */
   static to(targets, params) {
     return window.anime.animate(targets, params);
@@ -25,9 +35,10 @@ class AnimeHelper {
 
   /**
    * Creates a "from" animation, animating from the given values to the element's current state.
+   * @static
    * @param {string|HTMLElement|NodeList} targets - The element(s) to animate.
-   * @param {object} params - The Anime.js parameters defining the starting state.
-   * @returns {object} The Anime.js instance.
+   * @param {object} params - The Anime.js parameters object defining the starting state.
+   * @returns {object} The Anime.js animation instance.
    */
   static from(targets, params) {
     const finalParams = { ...params };
@@ -53,11 +64,12 @@ class AnimeHelper {
   }
 
   /**
-   * Creates a "fromTo" animation, animating from a specified start state to a specified end state.
+   * Creates a "fromTo" animation from a specified start state to a specified end state.
+   * @static
    * @param {string|HTMLElement|NodeList} targets - The element(s) to animate.
    * @param {object} fromParams - The object defining the starting state of the animation.
-   * @param {object} toParams - The object defining the ending state and animation parameters.
-   * @returns {object} The Anime.js instance.
+   * @param {object} toParams - The object defining the ending state and other animation parameters.
+   * @returns {object} The Anime.js animation instance.
    */
   static fromTo(targets, fromParams, toParams) {
     const finalParams = { ...toParams };
@@ -84,8 +96,9 @@ class AnimeHelper {
   }
 
   /**
-   * Creates a new Anime.js timeline.
-   * @param {object} [params] - The timeline parameters.
+   * Creates a new Anime.js timeline. A static shorthand for `anime.createTimeline()`.
+   * @static
+   * @param {object} params - The timeline parameters.
    * @returns {object} The Anime.js timeline instance.
    */
   static timeline(params) {
@@ -93,9 +106,10 @@ class AnimeHelper {
   }
 
   /**
-   * Adds a custom animation preset that can be used in configurations.
-   * @param {string} name - The name of the preset.
-   * @param {function} presetFn - A function that takes an options object and returns an Anime.js config.
+   * Adds a custom, reusable animation preset that can be used in configurations.
+   * @static
+   * @param {string} name - The name of the preset (e.g., 'zoomIn').
+   * @param {function} presetFn - A function that takes an options object and returns a valid AnimeHelper config object.
    */
   static addPreset(name, presetFn) {
     AnimeHelper._presets[name] = presetFn;
@@ -104,6 +118,7 @@ class AnimeHelper {
   // --- GLOBAL CONTROL METHODS ---
   /**
    * Pauses all animations controlled by all AnimeHelper instances.
+   * @static
    */
   static pauseAll() {
     AnimeHelper._instances.forEach((instance) =>
@@ -113,8 +128,10 @@ class AnimeHelper {
       })
     );
   }
+
   /**
    * Plays (resumes) all animations controlled by all AnimeHelper instances.
+   * @static
    */
   static playAll() {
     AnimeHelper._instances.forEach((instance) =>
@@ -124,8 +141,10 @@ class AnimeHelper {
       })
     );
   }
+
   /**
-   * Restarts all animations controlled by all AnimeHelper instances.
+   * Restarts all animations controlled by all AnimeHelper instances from the beginning.
+   * @static
    */
   static restartAll() {
     AnimeHelper._instances.forEach((instance) =>
@@ -135,8 +154,10 @@ class AnimeHelper {
       })
     );
   }
+
   /**
-   * Destroys all AnimeHelper instances and cleans up all animations and listeners.
+   * Destroys all AnimeHelper instances, cleaning up all animations, listeners, and elements.
+   * @static
    */
   static killAll() {
     while (AnimeHelper._instances.length) {
@@ -146,6 +167,7 @@ class AnimeHelper {
 
   /**
    * Initializes the AnimeHelper instance.
+   * Sets up global event listeners for scroll, resize, and page load, and registers the instance for global controls.
    */
   constructor() {
     this.anime = window.anime;
@@ -156,18 +178,23 @@ class AnimeHelper {
     this.elementMap = new Map();
     this._initializePresets();
     this.isTicking = false;
+
     this._boundScrollHandler = this._handleScroll.bind(this);
     this._boundResizeHandler = this._handleResize.bind(this);
+
     window.addEventListener("scroll", this._boundScrollHandler, {
       passive: true,
     });
     window.addEventListener("resize", this._boundResizeHandler);
+    window.addEventListener("load", this._boundResizeHandler);
+
     AnimeHelper._instances.push(this);
   }
 
   // --- PUBLIC CONTROL & CORE METHODS ---
   /**
-   * Recalculates the positions for all scroll-triggered animations.
+   * Recalculates the positions and dimensions for all scroll-triggered animations.
+   * Crucial for use in SPAs or after dynamic content changes (e.g., loading images).
    * @returns {this} The AnimeHelper instance for chaining.
    */
   refresh() {
@@ -176,9 +203,9 @@ class AnimeHelper {
   }
 
   /**
-   * Retrieves the animation data objects for a given target.
+   * Retrieves the internal data objects for a given target selector or element.
    * @param {string|HTMLElement} target - The CSS selector or element to find.
-   * @returns {object[]} An array of data objects.
+   * @returns {object[]} An array of data objects, each containing the animation instance and config.
    */
   get(target) {
     return this._getElements(target)
@@ -227,9 +254,9 @@ class AnimeHelper {
   }
 
   /**
-   * Seeks the animations for the given target(s) to a specific time or percentage.
+   * Seeks the animations for a target to a specific time (in ms) or percentage.
    * @param {string|HTMLElement} target - The CSS selector or element to seek.
-   * @param {number|string} value - The time in ms or percentage (e.g., "50%").
+   * @param {number|string} value - The time in milliseconds or a percentage string (e.g., "50%").
    * @returns {this} The AnimeHelper instance for chaining.
    */
   seek(target, value) {
@@ -246,10 +273,9 @@ class AnimeHelper {
   }
 
   /**
-   * The main public method. Finds targets, applies initial state, creates the animation,
-   * and prepares them for scroll-based interactions.
-   * @param {string|string[]|HTMLElement} target - The target element(s) for the animation.
-   * @param {object} config - The master animation configuration object.
+   * The main method. Finds target elements, applies their configuration, and prepares them for scroll-based interactions.
+   * @param {string|HTMLElement|NodeList} target - The element(s) to observe.
+   * @param {object} config - The master configuration object for the animation.
    * @returns {this} The AnimeHelper instance for chaining.
    */
   observe(target, config) {
@@ -275,11 +301,13 @@ class AnimeHelper {
   }
 
   /**
-   * Disconnects listeners and cleans up the instance to prevent memory leaks.
+   * Disconnects all listeners and cleans up elements to prevent memory leaks.
    */
   destroy() {
     window.removeEventListener("scroll", this._boundScrollHandler);
     window.removeEventListener("resize", this._boundResizeHandler);
+    window.removeEventListener("load", this._boundResizeHandler);
+
     AnimeHelper._instances = AnimeHelper._instances.filter(
       (inst) => inst !== this
     );
@@ -299,8 +327,10 @@ class AnimeHelper {
   }
 
   // --- PRIVATE HANDLERS, HELPERS, PRESETS, ETC. ---
+
   /**
-   * @private Throttled scroll handler using requestAnimationFrame.
+   * @private
+   * Throttled scroll handler that updates animations using requestAnimationFrame.
    */
   _handleScroll() {
     if (!this.isTicking) {
@@ -313,7 +343,8 @@ class AnimeHelper {
   }
 
   /**
-   * @private Recalculates bounds for all elements on resize.
+   * @private
+   * Handler for window resize and load events, recalculating all animation bounds.
    */
   _handleResize() {
     this.elementMap.forEach((data, el) => {
@@ -327,8 +358,9 @@ class AnimeHelper {
   }
 
   /**
-   * @private Core logic for updating all scroll-based animations.
-   * @param {number} scrollY - The current window.scrollY position.
+   * @private
+   * Core logic that runs on each scroll frame. Updates all observed animations based on scroll position.
+   * @param {number} scrollY - The current vertical scroll position of the window.
    */
   _updateScrollAnimations(scrollY) {
     this.elementMap.forEach((data, el) => {
@@ -337,10 +369,10 @@ class AnimeHelper {
       const config = data.config.scrollTrigger;
       const wasActive = data.scroll.isActive;
       const isActive = scrollY >= start && scrollY <= end;
-      const clampedProgress = Math.max(
-        0,
-        Math.min(1, (scrollY - start) / (end - start))
-      );
+      const clampedProgress =
+        end === start
+          ? 1
+          : Math.max(0, Math.min(1, (scrollY - start) / (end - start)));
       const direction = scrollY > (data.scroll.lastY || scrollY) ? 1 : -1;
 
       if (isActive && !wasActive) {
@@ -401,9 +433,10 @@ class AnimeHelper {
   }
 
   /**
-   * @private Executes a toggle action (play, pause, etc.) on an instance.
-   * @param {object} instance - The Anime.js instance.
-   * @param {string} actions - A space-separated string of actions (e.g., "play pause resume none").
+   * @private
+   * Executes a specific animation action (e.g., 'play', 'pause') based on the toggleActions string.
+   * @param {object} instance - The Anime.js animation instance.
+   * @param {string} actions - A space-separated string of actions (e.g., "play pause resume reverse").
    * @param {number} index - The index of the action to execute.
    */
   _runToggleAction(instance, actions, index) {
@@ -414,9 +447,10 @@ class AnimeHelper {
   }
 
   /**
-   * @private Calculates and caches the scroll start/end pixel values.
+   * @private
+   * Calculates the absolute pixel start and end values for a scroll trigger.
    * @param {HTMLElement} element - The target element.
-   * @param {object} data - The element's data object from the elementMap.
+   * @param {object} data - The element's stored data object.
    */
   _calculateScrollBounds(element, data) {
     const rect =
@@ -492,9 +526,10 @@ class AnimeHelper {
   }
 
   /**
-   * @private Creates the main animation timeline but does not play it.
+   * @private
+   * Creates and stores the main animation instance for an element.
    * @param {HTMLElement} target - The target element.
-   * @param {object} data - The element's data object.
+   * @param {object} data - The element's stored data object.
    */
   _playAnimation(target, data) {
     const config = this._getConfigFromPreset(data.config);
@@ -532,11 +567,12 @@ class AnimeHelper {
   }
 
   /**
-   * @private Builds an Anime.js timeline from a configuration object.
+   * @private
+   * Builds an Anime.js timeline instance from a configuration object.
    * @param {HTMLElement} target - The root element for the animation.
    * @param {object} config - The processed animation configuration.
-   * @param {boolean} [autoplay=true] - Whether the timeline should play immediately.
-   * @returns {object} The Anime.js timeline instance.
+   * @param {boolean} autoplay - Whether the timeline should play immediately.
+   * @returns {object} The created Anime.js timeline instance.
    */
   _createTimelineFromConfig(target, config, autoplay = true) {
     const timelineSettings =
@@ -561,11 +597,12 @@ class AnimeHelper {
   }
 
   /**
-   * @private Attaches event listeners for interactive controls.
+   * @private
+   * Attaches interactive event listeners (e.g., click, hover) to an element to control its animation.
    * @param {HTMLElement} target - The element to attach listeners to.
-   * @param {object} data - The state object for the element.
+   * @param {object} data - The element's stored data object.
    * @param {object} controls - The controls configuration (e.g., `{ onClick: 'restart' }`).
-   * @param {boolean} [isSubInstance=false] - Whether to control the main or sub-timeline instance.
+   * @param {boolean} isSubInstance - Whether to control the main or sub-timeline instance.
    */
   _setupControls(target, data, controls, isSubInstance = false) {
     const instance = isSubInstance ? data.subInstance : data.instance;
@@ -588,10 +625,11 @@ class AnimeHelper {
   }
 
   /**
-   * @private Creates a set of wrapped callback functions for Anime.js.
+   * @private
+   * Creates a set of wrapped callback functions (onBegin, onUpdate, onComplete) for an animation.
    * @param {HTMLElement} target - The element the callback relates to.
    * @param {object} config - The config object containing user-defined callbacks.
-   * @returns {object} An object with Anime.js-compatible callback keys.
+   * @returns {object} An object with Anime.js v4-compatible callback keys.
    */
   _createCallbackHooks(target, config) {
     const hooks = {};
@@ -608,10 +646,11 @@ class AnimeHelper {
   }
 
   /**
-   * @private Prepares the final `targets` and `params` for an animation step.
-   * @param {HTMLElement} target - The root element for this step.
-   * @param {object} config - The configuration for this specific animation.
-   * @returns {{targets: (HTMLElement|NodeList), params: object}}
+   * @private
+   * Prepares the final `targets` and `params` for an animation, handling special types like 'stagger' and 'text'.
+   * @param {HTMLElement} target - The root element for this animation step.
+   * @param {object} config - The configuration for this animation.
+   * @returns {{targets: (HTMLElement|NodeList), params: object}} An object containing the final targets and parameters.
    */
   _prepareAnimationConfig(target, config) {
     const params = { ...(config.params || {}) };
@@ -628,20 +667,22 @@ class AnimeHelper {
   }
 
   /**
-   * @private Plugin-like helper for stagger animations.
+   * @private
+   * "Plugin" helper for stagger animations. Returns the child elements to be staggered.
    * @param {HTMLElement} target - The parent element.
-   * @param {object} config - The stagger configuration.
-   * @returns {NodeList} The child elements to be staggered.
+   * @param {object} config - The animation configuration.
+   * @returns {NodeList} The list of child elements to animate.
    */
   _handleStaggerType(target, config) {
     return target.querySelectorAll(config.childSelector);
   }
 
   /**
-   * @private Plugin-like helper for text animations.
-   * @param {HTMLElement} target - The text element.
-   * @param {object} config - The text animation configuration.
-   * @returns {NodeList} The letter elements to be animated.
+   * @private
+   * "Plugin" helper for text animations. Splits text into letters/words and returns the letter elements.
+   * @param {HTMLElement} target - The text container element.
+   * @param {object} config - The animation configuration.
+   * @returns {NodeList} The list of letter `<span>` elements to animate.
    */
   _handleTextType(target, config) {
     if (!target.dataset.textSetup) {
@@ -669,9 +710,10 @@ class AnimeHelper {
   }
 
   /**
-   * @private Creates and configures the spacer element for pinning.
+   * @private
+   * Creates a spacer element for pinning, which holds the place of the pinned element in the document flow.
    * @param {HTMLElement} el - The element to pin.
-   * @param {object} data - The element's data object.
+   * @param {object} data - The element's stored data object.
    */
   _createPinSpacer(el, data) {
     const rect = el.getBoundingClientRect();
@@ -712,9 +754,10 @@ class AnimeHelper {
   }
 
   /**
-   * @private Updates the pin spacer's dimensions.
+   * @private
+   * Updates the dimensions of a pin spacer on resize.
    * @param {HTMLElement} el - The pinned element.
-   * @param {object} data - The element's data object.
+   * @param {object} data - The element's stored data object.
    */
   _updatePinSpacer(el, data) {
     Object.assign(el.style, data.scroll.originalStyles);
@@ -729,9 +772,10 @@ class AnimeHelper {
   }
 
   /**
-   * @private Creates the visual debug markers for a scroll trigger.
+   * @private
+   * Creates and displays visual markers for a scroll trigger's start and end points.
    * @param {HTMLElement} el - The target element.
-   * @param {object} data - The element's data object.
+   * @param {object} data - The element's stored data object.
    */
   _createMarkers(el, data) {
     const markerStyle = {
@@ -769,8 +813,9 @@ class AnimeHelper {
   }
 
   /**
-   * @private Updates the position of debug markers.
-   * @param {object} data - The element's data object.
+   * @private
+   * Updates the position of scroll trigger markers.
+   * @param {object} data - The element's stored data object containing the markers.
    */
   _updateMarkers(data) {
     if (data.scroll.startMarker)
@@ -780,10 +825,11 @@ class AnimeHelper {
   }
 
   /**
-   * @private Utility to create and configure a DOM element.
-   * @param {string} tag - The HTML tag name.
-   * @param {object} [attributes={}] - An object of attributes.
-   * @param {string|HTMLElement|Array<HTMLElement>} [content=null] - The element's content.
+   * @private
+   * A utility function to create a DOM element with specified attributes, styles, and content.
+   * @param {string} tag - The HTML tag to create.
+   * @param {object} attributes - An object of attributes (e.g., { class: 'foo', style: { color: 'red' } }).
+   * @param {string|HTMLElement|Array} content - The content to append to the element.
    * @returns {HTMLElement} The created element.
    */
   _createElement(tag, attributes = {}, content = null) {
@@ -810,9 +856,10 @@ class AnimeHelper {
   }
 
   /**
-   * @private Utility to find DOM elements from various target types.
-   * @param {string|string[]|HTMLElement} target - The target selector or element.
-   * @returns {Array<HTMLElement>} An array of found elements.
+   * @private
+   * A utility function to find DOM elements from various target types.
+   * @param {string|HTMLElement|NodeList} target - The target to resolve.
+   * @returns {HTMLElement[]} An array of found elements.
    */
   _getElements(target) {
     if (target instanceof HTMLElement) return [target];
@@ -831,9 +878,10 @@ class AnimeHelper {
   }
 
   /**
-   * @private Applies initial CSS styles to an element before animation.
-   * @param {HTMLElement} target - The element to style.
-   * @param {object} config - The animation config object.
+   * @private
+   * Applies the initial CSS styles to elements before they are animated.
+   * @param {HTMLElement} target - The root element being observed.
+   * @param {object} config - The animation configuration object.
    */
   _applyInitialState(target, config) {
     if (config.initialState) {
@@ -859,7 +907,8 @@ class AnimeHelper {
   }
 
   /**
-   * @private Retrieves a preset configuration and merges it with the user's config.
+   * @private
+   * Retrieves a preset configuration and merges it with the user's config.
    * @param {object} config - The user-provided configuration object.
    * @returns {object} The final, merged configuration object.
    */
@@ -875,7 +924,8 @@ class AnimeHelper {
   }
 
   /**
-   * @private Initializes the built-in and custom animation presets.
+   * @private
+   * Initializes the built-in and custom-added animation presets.
    */
   _initializePresets() {
     const builtInPresets = {
