@@ -1,7 +1,7 @@
 /**
  * AnimeHelper: A utility class to simplify and streamline animations using Anime.js.
- * Adds container-based scrubbing to the 'scroll' type.
- * @version 4.5.0
+ * Add static get method
+ * @version 4.7.2
  */
 class AnimeHelper {
   _anime;
@@ -11,6 +11,7 @@ class AnimeHelper {
   _resolveTargetsFn;
   _textSplitFn;
   _scrollFn;
+  _animatable;
 
   static _instances = new Map();
   static _syncQueue = [];
@@ -64,6 +65,10 @@ class AnimeHelper {
       return;
     }
     this._presets[name] = generator;
+  }
+
+  static get(instanceName) {
+    return this._instances.get(instanceName);
   }
 
   /* ========================== HELPER FUNCTIONS ================================ */
@@ -154,6 +159,7 @@ class AnimeHelper {
     this._resolveTargetsFn = lib.utils?.$ || lib.$;
     this._textSplitFn = lib.text?.split || lib.splitText;
     this._scrollFn = lib.scroll || lib.onScroll;
+    this._animatable = lib.animatable || lib.createAnimatable;
   }
 
   /**
@@ -212,8 +218,6 @@ class AnimeHelper {
     }
 
     if (config.type === "scroll") {
-      // --- NEW LOGIC for type 'scroll' ---
-      // If `animationTarget` is provided, the main `targets` becomes the observer target.
       const finalAnimationTarget = config.animationTarget || targets;
       const finalObserverTarget = config.animationTarget
         ? targets
@@ -224,7 +228,6 @@ class AnimeHelper {
         finalObserverTarget,
         config
       );
-      // --- END NEW LOGIC ---
     } else {
       const scrollObserver = this._createScrollObserver(observerTarget, config);
       const effectiveParams = { ...(config.params || {}) };
@@ -234,6 +237,12 @@ class AnimeHelper {
       const effectiveConfig = { ...config, params: effectiveParams };
 
       switch (effectiveConfig.type) {
+        case "animatable":
+          animationInstance = this._createAnimatable(
+            animationTarget,
+            config.params
+          );
+          break;
         case "splitText":
           animationInstance = this._createTextSplitAnimation(
             animationTarget,
@@ -275,10 +284,15 @@ class AnimeHelper {
     return animationInstance;
   }
 
+  _createAnimatable(targets, config) {
+    return this._animatable(targets, config);
+  }
+
   /**
    * The specialist method for creating 'scrubbing' animations.
    * It now accepts separate targets for the animation and the observer.
    * @private
+   *
    */
   _createScrollAnimation(animationTargets, observerTargets, config) {
     const { params = {}, scrollParams = {}, scrollContainer, preset } = config;
@@ -319,6 +333,12 @@ class AnimeHelper {
     });
   }
 
+  /**
+   *
+   * @todo - Review the array targets if the animation is properly being assigned
+   * @todo - check animejs if we're using multiple selector properly [char, words, lines]
+   *
+   */
   _createTextSplitAnimation(targets, config) {
     if (!this._textSplitFn) {
       console.error(
@@ -447,13 +467,17 @@ class AnimeHelper {
     return scope;
   }
 
-  _createSingleAnimation(targets, config) {
+  _createSingleAnimation(targets, config, returnAnimation = true) {
     let animationParams = { ...config.params };
     if (config.preset) {
       const preset = this.constructor._presets[config.preset];
       if (preset) {
         animationParams = { ...preset(config), ...animationParams };
       }
+    }
+
+    if (!returnAnimation) {
+      return animationParams;
     }
 
     return this._animateFn(targets, animationParams);
@@ -480,6 +504,11 @@ class AnimeHelper {
 
     if (Array.isArray(config.steps)) {
       config.steps.forEach((step) => {
+        if (step.instance) {
+          mainTl.sync(step.instance, step.offset);
+          return;
+        }
+
         const childElements = Array.isArray(step.target)
           ? step.target
           : parentElement
@@ -487,7 +516,7 @@ class AnimeHelper {
           : this._resolveTargetsFn(step.target);
 
         if (childElements.length > 0) {
-          if (step.params.stagger) {
+          if (step.params?.stagger) {
             step.params.delay = this._delayToStagger(step.params.stagger);
             delete step.params.stagger;
           }
@@ -496,23 +525,12 @@ class AnimeHelper {
             delete step.stagger;
           }
 
-          if (config.syncInstance === false) {
-            mainTl.add(
-              childElements,
-              {
-                ...step.params,
-              },
-              step.offset
-            );
-          } else {
-            mainTl.sync(
-              childElements,
-              {
-                ...step.params,
-              },
-              step.offset
-            );
-          }
+          const addAnimationParams = this._createSingleAnimation(
+            childElements,
+            step,
+            false
+          );
+          mainTl.add(childElements, addAnimationParams, step.offset);
         } else if (parentElement) {
           console.warn(
             `AnimeHelper: Timeline step target "${step.target}" not found within parent.`
