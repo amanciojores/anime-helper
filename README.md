@@ -1,156 +1,262 @@
-# AnimeHelper - A GSAP-like Helper for Anime.js
+# AnimeHelper.js
 
-AnimeHelper is a professional-grade toolkit for the Anime.js library (v4+). It provides a high-level, declarative API for creating complex, scroll-triggered, and interactive web animations with a strong focus on performance and ease of use, closely mirroring the developer experience of GSAP's ScrollTrigger plugin.
+#### Version: 4.8.2
 
-This class manages a single, optimized scroll listener for the entire page, ensuring smooth performance even with many animations.
+A high-level utility class to simplify and streamline the creation of complex, modern animations using Anime.js. This helper abstracts common animation patterns like scroll-triggered reveals, text splitting, timeline orchestration, and element pinning into a declarative, easy-to-use API.
 
 ## Features
 
-- GSAP-like ScrollTrigger: Create animations that are controlled by the user's scroll position.
-- Pinning: Lock an element to the screen for a specific scroll duration.
-- Scrubbing: Link an animation's progress directly to the scrollbar.
-- Declarative API: Define complex animations with a simple configuration object.
-- Built-in & Custom Presets: Use pre-made animations or easily add your own.
-- Full Animation Control: Public methods (play, pause, restart, seek) and global controls (pauseAll, killAll) for managing animations from anywhere in your code.
-- SPA Ready: Includes a refresh() method to update animations after dynamic content changes.
-- Performance Optimized: Uses requestAnimationFrame and passive listeners for smooth, jank-free scrolling.
-- Debug Markers: Visually debug your scroll trigger start and end points.
+- Declarative API: Create complex animations with a single, readable configuration object.
+- Universal Scroll Triggers: Add scroll-triggered "reveal" or "scrubbing" animations to any animation type.
+- Advanced Text Splitting: Animate text by characters, words, or lines, including multi-layered timeline-based text effects.
+- CSS-First Pinning: Easily create "sticky" scrolling sections where an animation scrubs its progress.
+- Powerful Timeline Builder: Construct complex, multi-step timelines, including support for syncing reusable animation instances.
+- Instance Management: Create reusable, controllable animation instances and manage them globally with static methods (.get(), .play(), .killAll(), etc.).
+- Extensible Presets: A simple system to add your own reusable animation presets.
 
 ## Setup
 
-1. Include Anime.js: Make sure you have Anime.js v4.1.3 or higher included in your project.
+The AnimeHelper class works in both modern module and traditional script environments.
 
+#### Option 1: As a Module (Recommended)
+
+This is the modern, recommended approach.
+
+1. Include Files: Make sure you are properly importing the latest `anime.js` module via CDN or local file import and anime-helper.js are available to your project.
+
+```html
+<script type="module" src="anime.esm.js"></script>
 ```
-<!-- ANIME.JS v4.1.3 (IIFE Global Build) -->
-<script src="https://cdn.jsdelivr.net/npm/animejs@4.1.3/lib/anime.iife.min.js"></script>
+
+- OR
+
+```html
+<script type="module">
+  import { animate } from "https://cdn.jsdelivr.net/npm/animejs/+esm";
+</script>
 ```
 
-2. Include AnimeHelper: Add the anime-helper.js script to your page.
+- OR via `npm install animejs`
 
-```
-<script src="path/to/anime-helper.js"></script>
-```
-
-## Usage/Examples
-
-1. Initialize the Helper: Create a new instance of the class, typically after the DOM has loaded.
+2. Import and Initialize: In your main script, import both libraries and create a new helper instance.
 
 ```javascript
-document.addEventListener("DOMContentLoaded", () => {
-  const helper = new AnimeHelper();
+// In your-main-script.js
+import anime from "./anime.esm.js";
+import AnimeHelper from "./anime-helper.js";
 
-  // Your animation code here...
-});
+const helper = new AnimeHelper(anime);
 ```
 
-2. Observe an Element: Use the observe() method to target an element and apply an animation.
+3. Link HTML: Include your main script in your HTML file with type="module".
+
+```html
+<script type="module" src="your-main-script.js"></script>
+```
+
+#### Option 2: As a Standard Script (Non-Module)
+
+1. Include the Scripts: Add the scripts to your HTML using standard `<script>` tags. Make sure `anime-helper.js` comes after anime.js.
+
+```html
+<script src="anime.js"></script>
+<script src="anime-helper.js"></script>
+<script src="your-main-script.js"></script>
+```
+
+2. Initialize the Helper: In your main script, AnimeHelper will be available on the global window object.
 
 ```javascript
-helper.observe(".my-element", {
-  preset: "fadeIn", // Use a built-in preset
-  scrollTrigger: {
-    start: "top 80%", // Start when the top of the element is 80% down the viewport
-    markers: true, // Show debug markers
+// In your-main-script.js
+const helper = new AnimeHelper(window.anime);
+```
+
+## Usage
+
+The core of the library is the `helper.observe(targets, config)` method.
+
+#### Basic Animation
+
+This is the default behavior if no `type` is specified.
+
+```javascript
+helper.observe(".my-box", {
+  params: {
+    translateX: 250,
+    rotate: "1turn",
+    duration: 800,
   },
 });
+```
+
+#### Text Animation (`type: 'splitText'`)
+
+```javascript
+helper.observe(".my-title", {
+  type: "splitText",
+  splitBy: "chars", // 'words' or 'lines. Supports array ['words', 'chars', 'lines]
+  splitParams: {
+    from: "bottom", // 'top', 'left', 'right'
+    stagger: 30,
+    distance: "1em",
+  },
+  params: {
+    duration: 800,
+    ease: "easeOutQuint",
+  },
+});
+```
+
+#### Scroll-Triggered Animations
+
+You can add a scrollParams object to any animation type to make it scroll-triggered.
+
+#### Reveal Animation (Plays on Enter)
+
+This is the default scroll behavior. The animation plays when it enters the viewport.
+
+```javascript
+helper.observe(".fade-in-card", {
+  type: "default", // Can be any type
+  preset: "fadeIn",
+  scrollParams: {
+    enter: "start 80%", // Target's top hits 80% down the viewport
+    once: true, // Only play the animation once
+    resetOnLeave: true, // Reset the animation when it scrolls out of view
+  },
+});
+```
+
+#### Scrubbing Animation (Syncs with Scroll)
+
+To make an animation's progress directly match the scrollbar position, add `sync: true`.
+
+```javascript
+helper.observe(".progress-bar", {
+  type: "default",
+  params: {
+    scaleX: [0, 1],
+  },
+  scrollParams: {
+    sync: true, // This enables scrubbing
+    enter: "top bottom", // Starts when element top hits viewport bottom
+    leave: "bottom top", // Ends when element bottom hits viewport top
+  },
+});
+```
+
+#### Pinning (`pin: true`)
+
+Create a "sticky" section where an animation scrubs while the user scrolls.
+
+```javascript
+helper.observe(".pin-container", {
+  pin: true,
+  pinParams: {
+    target: ".element-to-make-sticky",
+    animationTarget: ".element-to-animate-inside",
+    duration: "200vh", // Pin will last for 200% of the viewport height. Supports relative values like +=, -=. (*= not yet supported)
+    start: "0px",
+  },
+  params: {
+    rotate: 360,
+    easing: "linear",
+  },
+});
+```
+
+#### Timelines (type: 'timeline')
+
+Build complex, multi-step animation sequences.
+
+```javascript
+// First, create a reusable animation
+const reusableAnim = helper.observe(".reusable-box", {
+  reusable: true, // This sets autoplay: false
+  params: { scale: 1.2 },
+});
+
+helper.observe(null, {
+  type: "timeline",
+  params: { loop: true, direction: "alternate" },
+  steps: [
+    // Step 1: Build from a config object
+    {
+      target: ".box-1",
+      params: { translateX: 250, duration: 500 },
+    },
+    // Step 2: Sync a pre-built, reusable animation instance
+    {
+      instance: reusableAnim,
+      offset: "<", // Start when the previous animation ends
+    },
+  ],
+});
+```
+
+#### Reusable Animations & Instance Control
+
+Create animations that don't play immediately and control them with static methods.
+
+```javasacript
+// 1. Create a reusable animation instance
+helper.observe('.my-interactive-element', {
+  reusable: true, // Sets autoplay: false
+  params: {
+    scale: [1, 1.2],
+    duration: 300
+  }
+});
+
+// 2. Control it later from anywhere in your code
+const button = document.querySelector('#my-button');
+button.addEventListener('click', () => {
+  // Use the static .get() method to retrieve and control the instance
+  AnimeHelper.get('.my-interactive-element').restart();
+});
+```
+
+- `observe()`also returns animation instance. You can use assign an animation instance to a variable instead of using `get()`
+
+```javasrcipt
+const myInteractiveElement = helper.observe('.my-interactive-element', {...});
+console.log(myInteractiveElement); // Log animation instance
 ```
 
 ## API Reference
 
-`new AnimeHelper()`
+`helper.observe(targets, config)`
 
-Creates a new instance of the helper and sets up the global scroll/resize listeners. You typically only need one instance per page.
+This is the core method for creating all animations.
 
-`helper.observe(target, config)`
+- `targets` (`String|HTMLElement|NodeList`): The primary element(s) for the effect. For `pin` and container-based `scroll` animations, this is the container/track element.
+- `config` (`Object`): The main configuration object that defines the animation's behavior.
 
-This is the main method for creating scroll-based animations.
+`config` Object Properties
+| Property          | Type      | Description                                                                         |
+| :---              | :----     | :---                                                                                |
+| `type`            | `String`  | Optional. The type of animation to create. Can be `'default' or null or omitted`, `'splitText'`, `'timeline'`, `'scroll'`, `'pin'`. Defaults to `'default'`.        |
+| `pin`             | `Boolean` | If true, enables the pinning feature. This forces the animation to be a `type: 'scroll'` scrubbing animation. |
+| `reusable`        | `Boolean` | If true, creates the animation with autoplay: false, making it a reusable instance that can be controlled manually. |
+| `animationTarget` | `String`  | Optional selector for type: 'scroll'. Specifies the child element(s) to animate while the main targets element is used as the scroll track. (can also use `target` or `targets` inside `pinParams`) |
+| `params`          | `Object`  | The standard [anime.js](https://animejs.com/) parameters for the animation (e.g., `translateX`, `duration`, `easing`). |
+| `scrollParams`    | `Object`  | Configuration for the [anime.js scroll observer](https://animejs.com/documentation/scroll). Adding this to any non-scroll type makes it scroll-triggered.   |
+| `pinParams`       | `Object`  | Configuration for the pinning effect. Used only when `pin: true`. (e.g., `{ duration: '200vh', target: '.sticky-child' }`). `duration` supports relative values.    |
+| `splitParams`     | `Object`  | Configuration for `type: 'splitText'`. (e.g., `{ from: 'bottom', stagger: 50 }`) |
+| `timelineParams`  | `Object`  | Configuration for `type: 'timeline'`. The steps array is the most important property here. |
 
-- `target`: A CSS selector string, an array of selectors, or a DOM element.
+#### Static Control Methods
+These methods are called directly on the AnimeHelper class (e.g., AnimeHelper.get(...)) to control named animation instances created with string selectors.
 
-#### Config Object Properties:
-
-| Property        | Type     | Description                                                                                           |
-| :-------------- | :------- | :---------------------------------------------------------------------------------------------------- |
-| `preset`        | `string` | The name of a built-in or custom preset to use (e.g., `'fadeIn'`).                                    |
-| `params`        | `object` | An Anime.js parameters object for custom animations.                                                  |
-| `type`          | `string` | Special animation type. Can be `'stagger'` or `'text'`.                                               |
-| `childSelector` | `string` | **Required** if `type: 'stagger'`. A CSS selector for the children to stagge                          |
-| `scrollTrigger` | `object` | An object to configure the scroll-based behavior. See details below.                                  |
-| `subTimeline`   | `object` | Defines a secondary animation on a child element.                                                     |
-| `controls`      | `object` | Defines interactive controls like `{ onClick: 'restart' }`.                                           |
-| `onUpdate`      | `string` | A callback function that fires every frame of the animation. Receives `(element, animationInstance)`. |
-| `id`            | `string` | **Required**. Id of item to fetch                                                                     |
-| `id`            | `string` | **Required**. Id of item to fetch                                                                     |
-
-#### The scrollTrigger Object:
-
-| Property  | Type      | Description                                                                                                                  |
-| :-------- | :-------- | :--------------------------------------------------------------------------------------------------------------------------- |
-| `start`   | `string`  | The trigger point. Format: `"[elementEdge] [viewportEdge]"`. Default: `'top bottom'`. Examples: `'top top'`, `'center 80%'`. |
-| `end`     | `string`  | The end point for the scroll animation. Can be absolute (`'bottom top'`) or relative to the start (`'+=500'`, `'+=100%'`)    |
-| `pin`     | `boolean` | If `true`, the element will be pinned to the screen for the duration of the scroll trigger.                                  |
-| `scrub`   | `boolean` | If `true`, the animation's progress is directly linked to the scroll position..                                              |
-| `markers` | `boolean` | If `true`, visual markers for the start and end points will be displayed on the page.                                        |
-
-#### Instance Controls
-
-These methods allow you to control animations on specific targets. All are chainable.
-
-- `helper.play('.my-element')`
-- `helper.pause('.my-element')`
-- `helper.reverse('.my-element')`
-- `helper.restart('.my-element')`
-- `helper.seek('.my-element', '50%')`
-- `helper.refresh()`: Recalculates all scroll trigger positions.
-
-### Static API
-
-These methods can be called directly on the class for one-off animations not tied to the helper's scroll functionality.
-
-- `AnimeHelper.to(target, params)`
-- `AnimeHelper.from(target, params)`
-- `AnimeHelper.fromTo(target, fromParams, toParams)`
-- `AnimeHelper.timeline(params)`
-- `AnimeHelper.addPreset(name, presetFunction)`
-
-### Global Controls
-
-- `AnimeHelper.pauseAll()`: Pauses every animation on the page.
-- `AnimeHelper.playAll()`: Resumes every animation on the page.
-- `AnimeHelper.restartAll()`: Restarts every animation on the page.
-- `AnimeHelper.killAll()`: Destroys all helper instances and removes all animations/listeners.
-
-## Advanced Example
-
-This example pins a container to the top of the screen and then scrubs through an animation as the user scrolls.
-
-```javascript
-helper.observe(".my-pinned-section", {
-  type: "timeline",
-  params: {
-    steps: [
-      {
-        target: ".my-pinned-section .title",
-        params: {
-          scale: [1, 1.5],
-          opacity: [1, 0],
-        },
-      },
-      {
-        target: ".my-pinned-section .image",
-        params: {
-          rotate: 360,
-        },
-        offset: "-=500", // Overlap the animations
-      },
-    ],
-  },
-  scrollTrigger: {
-    pin: true,
-    scrub: true,
-    start: "top top",
-    end: "+=200%", // Pin for a scroll distance equal to 200% of the viewport height
-    markers: true,
-  },
-});
-```
+| Method | Description |
+| :--    | :--         |
+| `AnimeHelper.get(selector)`     | Retrieves a stored animation instance by its selector. 
+| `AnimeHelper.getAll()`          | Retrieves the entire Map of all stored instances.
+| `AnimeHelper.play(selector)`    | Plays a specific animation instance.
+| `AnimeHelper.playAll()`         | Plays all stored animation instances.
+| `AnimeHelper.pause(selector)`   | Pauses a specific animation instance.
+| `AnimeHelper.pauseAll()`        | Pauses all stored animation instances.
+| `AnimeHelper.restart(selector)` | Restarts a specific animation instance from the beginning.
+| `AnimeHelper.restartAll()`      | Restarts all stored animation instances.
+| `AnimeHelper.kill(selector)`    | Kills and reverts a specific animation instance, removing its effects.
+| `AnimeHelper.killAll()`         | Kills and reverts all stored animation instances.

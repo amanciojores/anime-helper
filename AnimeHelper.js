@@ -1,6 +1,6 @@
 /**
  * @class AnimeHelper
- * @version 4.8.1
+ * @version 4.8.2
  * @summary A high-level utility class to simplify and streamline the creation of complex animations using Anime.js.
  * @description This helper abstracts common animation patterns like scroll-triggered reveals, text splitting,
  * timeline orchestration, and element pinning into a declarative, easy-to-use API.
@@ -798,3 +798,7 @@ class AnimeHelper {
 }
 
 export default AnimeHelper;
+
+if (typeof window !== "undefined") {
+  window.AnimeHelper = AnimeHelper;
+}
