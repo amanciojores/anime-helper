@@ -1,7 +1,9 @@
 /**
- * AnimeHelper: A utility class to simplify and streamline animations using Anime.js.
- * Add static get method
- * @version 4.7.2
+ * @class AnimeHelper
+ * @version 4.8.1
+ * @summary A high-level utility class to simplify and streamline the creation of complex animations using Anime.js.
+ * @description This helper abstracts common animation patterns like scroll-triggered reveals, text splitting,
+ * timeline orchestration, and element pinning into a declarative, easy-to-use API.
  */
 class AnimeHelper {
   _anime;
@@ -13,10 +15,27 @@ class AnimeHelper {
   _scrollFn;
   _animatable;
 
+  /**
+   * @type {Map<string, object>}
+   * @private
+   * @static
+   * @description A map to store and retrieve animation instances by their string selector.
+   */
   static _instances = new Map();
+  /**
+   * @type {Array<object>}
+   * @private
+   * @static
+   * @description A queue for timeline syncing operations, processed after all instances are created.
+   */
   static _syncQueue = [];
 
   /* ========================== GLOBAL FUNCTIONS ================================ */
+
+  /**
+   * @static
+   * @description Processes the sync queue, linking slave timelines to their masters. Should be called after all helpers are initialized.
+   */
   static applySyncs() {
     this._syncQueue.forEach(({ slave, masterSelector, offset }) => {
       const masterTimeline = this._instances.get(masterSelector);
@@ -31,6 +50,12 @@ class AnimeHelper {
     this._syncQueue = [];
   }
 
+  /**
+   * @type {Object.<string, Function>}
+   * @private
+   * @static
+   * @description A registry for animation presets that can be used across instances.
+   */
   static _presets = {
     fadeIn: (config) => {
       const from = config.from || "bottom";
@@ -57,6 +82,12 @@ class AnimeHelper {
     },
   };
 
+  /**
+   * Adds a new animation preset to the helper.
+   * @static
+   * @param {string} name - The name of the preset.
+   * @param {Function} generator - A function that takes a config object and returns an anime.js params object.
+   */
   static addPreset(name, generator) {
     if (typeof name !== "string" || typeof generator !== "function") {
       console.error(
@@ -67,16 +98,153 @@ class AnimeHelper {
     this._presets[name] = generator;
   }
 
+  /**
+   * Retrieves a stored animation instance by its selector.
+   * @static
+   * @param {string} instanceName - The string selector used to create the animation.
+   * @returns {object|undefined} The anime.js animation instance.
+   */
   static get(instanceName) {
     return this._instances.get(instanceName);
   }
 
+  /**
+   * Retrieves the entire map of stored animation instances.
+   * @static
+   * @returns {Map<string, object>} The map of all named instances.
+   */
+  static getAll() {
+    return this._instances;
+  }
+
+  /**
+   * Reverts a specific animation instance to its original state.
+   * @static
+   * @param {string} instanceName - The selector of the instance to kill.
+   */
+  static kill(instanceName) {
+    this.#assignMethodToAnimation(this.get(instanceName), "revert");
+  }
+
+  /**
+   * Reverts all stored animation instances.
+   * @static
+   */
+  static killAll() {
+    this.#assignMethodToAnimation(this.getAll(), "revert");
+  }
+
+  /**
+   * Plays a specific animation instance.
+   * @static
+   * @param {string} instanceName - The selector of the instance to play.
+   */
+  static play(instanceName) {
+    this.#assignMethodToAnimation(this.get(instanceName), "play");
+  }
+
+  /**
+   * Plays all stored animation instances.
+   * @static
+   */
+  static playAll() {
+    this.#assignMethodToAnimation(this.getAll(), "play");
+  }
+
+  /**
+   * Pauses a specific animation instance.
+   * @static
+   * @param {string} instanceName - The selector of the instance to pause.
+   */
+  static pause(instanceName) {
+    this.#assignMethodToAnimation(this.get(instanceName), "pause");
+  }
+
+  /**
+   * Pauses all stored animation instances.
+   * @static
+   */
+  static pauseAll() {
+    this.#assignMethodToAnimation(this.getAll(), "pause");
+  }
+
+  /**
+   * Resumes a specific animation instance.
+   * @static
+   * @param {string} instanceName - The selector of the instance to resume.
+   */
+  static resume(instanceName) {
+    this.#assignMethodToAnimation(this.get(instanceName), "resume");
+  }
+
+  /**
+   * Resumes all stored animation instances.
+   * @static
+   */
+  static resumeAll() {
+    this.#assignMethodToAnimation(this.getAll(), "resume");
+  }
+
+  /**
+   * Restarts a specific animation instance.
+   * @static
+   * @param {string} instanceName - The selector of the instance to restart.
+   */
+  static restart(instanceName) {
+    this.#assignMethodToAnimation(this.get(instanceName), "restart");
+  }
+
+  /**
+   * Restarts all stored animation instances.
+   * @static
+   */
+  static restartAll() {
+    this.#assignMethodToAnimation(this.getAll(), "restart");
+  }
+
   /* ========================== HELPER FUNCTIONS ================================ */
 
+  /**
+   * A private static helper to apply a method to a single instance or a map of instances.
+   * @private
+   * @static
+   * @param {object|Map<string, object>} instance - The animation instance or a Map of instances.
+   * @param {string} method - The name of the method to call (e.g., 'play', 'pause').
+   */
+  static #assignMethodToAnimation(instance, method) {
+    if (!instance) return;
+
+    if (instance instanceof Map) {
+      instance.forEach((animation) => {
+        if (animation && typeof animation[method] === "function") {
+          animation[method]();
+        }
+      });
+      return;
+    }
+
+    if (instance && typeof instance[method] === "function") {
+      instance[method]();
+    }
+  }
+
+  /**
+   * Converts a numerical delay into an anime.js stagger function.
+   * @param {number} value - The stagger delay in milliseconds.
+   * @returns {Function} An anime.js stagger function.
+   * @private
+   */
   _delayToStagger(value) {
     return this._anime.stagger(value);
   }
 
+  /**
+   * Retrieves a preset animation configuration object.
+   * @param {string} preset - The name of the preset.
+   * @param {object} config - The user's main configuration object.
+   * @returns {object} The preset's parameter object.
+   * @private
+   */
   _getPreset(preset, config) {
     if (preset) {
       const presetFn = this.constructor._presets[preset];
@@ -87,6 +255,12 @@ class AnimeHelper {
     return {};
   }
 
+  /**
+   * Parses a CSS value string into a number and unit.
+   * @param {string} cssValue - The CSS value to parse (e.g., '100vh', '-50px').
+   * @returns {{value: number, unit: string}|null} An object with the value and unit.
+   * @private
+   */
   _parseCssValue(cssValue) {
     if (typeof cssValue !== "string") return null;
     const match = cssValue.match(/^(\-?[\d\.]+)([a-z%]*)$/i);
@@ -96,6 +270,13 @@ class AnimeHelper {
     }
     return null;
   }
+
+  /**
+   * Creates the DOM structure and applies CSS for the pinning effect.
+   * @param {HTMLElement} parentTarget - The element that will act as the scrollable track.
+   * @param {object} config - The pin configuration from `pinParams`.
+   * @private
+   */
   _createPin(parentTarget, config) {
     const { duration = "auto", start = "0px", target } = config;
     const trackElement = this._resolveTargetsFn(parentTarget)[0];
@@ -108,7 +289,7 @@ class AnimeHelper {
 
     const pinElements = target
       ? trackElement.querySelectorAll(target)
-      : [trackElement]; // Fallback to pinning the track itself
+      : [trackElement];
 
     if (!pinElements || pinElements.length === 0) {
       console.warn(
@@ -117,13 +298,11 @@ class AnimeHelper {
       return;
     }
 
-    // Apply sticky positioning to the element(s) to be pinned
     pinElements.forEach((el) => {
       el.style.position = "sticky";
       el.style.top = start;
     });
 
-    // Adjust the height of the TRACK to create the scrollable duration
     if (duration !== "auto") {
       const relativeValues = ["-=", "+="];
       if (relativeValues.some((value) => duration.includes(value))) {
@@ -145,8 +324,12 @@ class AnimeHelper {
     }
   }
 
-  /* ==========================                  ================================ */
+  /* ========================== CORE METHODS ================================ */
 
+  /**
+   * Initializes the AnimeHelper instance.
+   * @param {object} animeInstance - An instance of the Anime.js library.
+   */
   constructor(animeInstance) {
     const lib =
       animeInstance ||
@@ -164,7 +347,9 @@ class AnimeHelper {
 
   /**
    * Creates a scroll observer if scrollParams are provided.
-   * This is the central logic for all scroll-triggered animations.
+   * @param {string|HTMLElement|Array<HTMLElement>} targets - The element to observe.
+   * @param {object} config - The main configuration object.
+   * @returns {object|undefined} An Anime.js scroll observer instance.
    * @private
    */
   _createScrollObserver(targets, config) {
@@ -188,11 +373,15 @@ class AnimeHelper {
       ...scrollParams,
     };
 
-    // Create the observer instance. Anime.js will automatically link it
-    // to the animation when it's passed into the `autoplay` property.
     return this._scrollFn(observerConfig);
   }
 
+  /**
+   * The main method to create and control animations.
+   * @param {string|HTMLElement|Array<HTMLElement>} targets - The primary target for the animation or effect.
+   * @param {object} config - The configuration object for the animation.
+   * @returns {object|undefined} The created Anime.js instance.
+   */
   observe(targets, config) {
     if (!config) {
       console.warn("AnimeHelper.observe() expects a configuration object.");
@@ -200,8 +389,8 @@ class AnimeHelper {
     }
 
     let animationInstance;
-    let animationTarget = targets; // Default animation target
-    let observerTarget = targets; // Default observer target
+    let animationTarget = targets;
+    let observerTarget = targets;
 
     if (config.pin) {
       const pinParams = config.pinParams || {};
@@ -218,7 +407,11 @@ class AnimeHelper {
     }
 
     if (config.type === "scroll") {
-      const finalAnimationTarget = config.animationTarget || targets;
+      const finalAnimationTarget =
+        config.animationTarget ||
+        config.pinParams?.target ||
+        config.pinParams?.targets ||
+        targets;
       const finalObserverTarget = config.animationTarget
         ? targets
         : finalAnimationTarget;
@@ -233,6 +426,9 @@ class AnimeHelper {
       const effectiveParams = { ...(config.params || {}) };
       if (scrollObserver) {
         effectiveParams.autoplay = scrollObserver;
+      } else if (config.reusable) {
+        effectiveParams.autoplay = false;
+        delete config.reusable;
       }
       const effectiveConfig = { ...config, params: effectiveParams };
 
@@ -284,15 +480,24 @@ class AnimeHelper {
     return animationInstance;
   }
 
+  /**
+   * Creates a stateful, controllable animatable instance.
+   * @param {string|HTMLElement|Array<HTMLElement>} targets - The animation targets.
+   * @param {object} config - The animatable parameters object.
+   * @returns {object} An anime.js animatable instance.
+   * @private
+   */
   _createAnimatable(targets, config) {
     return this._animatable(targets, config);
   }
 
   /**
-   * The specialist method for creating 'scrubbing' animations.
-   * It now accepts separate targets for the animation and the observer.
+   * Creates a scrubbing scroll animation.
+   * @param {string|HTMLElement|Array<HTMLElement>} animationTargets - The element(s) to animate.
+   * @param {string|HTMLElement|Array<HTMLElement>} observerTargets - The element that drives the scroll progress.
+   * @param {object} config - The main configuration object.
+   * @returns {object} An anime.js animation instance.
    * @private
-   *
    */
   _createScrollAnimation(animationTargets, observerTargets, config) {
     const { params = {}, scrollParams = {}, scrollContainer, preset } = config;
@@ -319,7 +524,6 @@ class AnimeHelper {
       sync: true,
     };
 
-    // The animation targets can be different from the observer target.
     const finalAnimationTargets = config.animationTarget
       ? this._resolveTargetsFn(observerTargets)[0].querySelectorAll(
           animationTargets
@@ -334,10 +538,11 @@ class AnimeHelper {
   }
 
   /**
-   *
-   * @todo - Review the array targets if the animation is properly being assigned
-   * @todo - check animejs if we're using multiple selector properly [char, words, lines]
-   *
+   * Creates a text splitting animation.
+   * @param {string|HTMLElement|Array<HTMLElement>} targets - The text element to split and animate.
+   * @param {object} config - The main configuration object.
+   * @returns {object} An anime.js animation or timeline instance.
+   * @private
    */
   _createTextSplitAnimation(targets, config) {
     if (!this._textSplitFn) {
@@ -399,6 +604,13 @@ class AnimeHelper {
     return this._animateFn(splitTargets, finalConfig);
   }
 
+  /**
+   * Creates a multi-layered text splitting timeline.
+   * @param {string|HTMLElement|Array<HTMLElement>} targets - The text element to split.
+   * @param {object} config - An object containing splitBy, splitParams, and timelineParams.
+   * @returns {object} An anime.js timeline instance.
+   * @private
+   */
   _createMultiSplitTimeline(targets, { splitBy, splitParams, timelineParams }) {
     const { debug = false, splitOptions = {} } = splitParams;
 
@@ -441,6 +653,13 @@ class AnimeHelper {
     return this._buildTimeline(null, timelineParams);
   }
 
+  /**
+   * Creates a scoped animation.
+   * @param {string|HTMLElement|Array<HTMLElement>} targets - The root element for the scope.
+   * @param {object} config - The main configuration object.
+   * @returns {object} An anime.js scope instance.
+   * @private
+   */
   _createScopedAnimation(targets, config) {
     const scopeParams = { ...config.scopeParams };
     scopeParams.root = targets;
@@ -467,6 +686,14 @@ class AnimeHelper {
     return scope;
   }
 
+  /**
+   * Creates a single, standard animation instance.
+   * @param {string|HTMLElement|Array<HTMLElement>} targets - The animation targets.
+   * @param {object} config - The main configuration object.
+   * @param {boolean} [returnAnimation=true] - Whether to return a full instance or just the params object.
+   * @returns {object} An anime.js animation instance or a parameter object.
+   * @private
+   */
   _createSingleAnimation(targets, config, returnAnimation = true) {
     let animationParams = { ...config.params };
     if (config.preset) {
@@ -483,6 +710,13 @@ class AnimeHelper {
     return this._animateFn(targets, animationParams);
   }
 
+  /**
+   * Builds an anime.js timeline from a declarative configuration.
+   * @param {string|HTMLElement|Array<HTMLElement>|null} parentTargets - The parent element for nested target selectors.
+   * @param {object} config - The main configuration object.
+   * @returns {object} An anime.js timeline instance.
+   * @private
+   */
   _buildTimeline(parentTargets, config) {
     const timelineParams = { ...config.params };
     const mainTl = this._timelineFn(timelineParams);
@@ -554,6 +788,10 @@ class AnimeHelper {
     return mainTl;
   }
 
+  /**
+   * Returns the underlying anime.js library instance.
+   * @returns {object} The anime.js instance.
+   */
   get anime() {
     return this._anime;
   }
