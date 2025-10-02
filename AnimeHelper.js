@@ -1,6 +1,6 @@
 /**
  * @class AnimeHelper
- * @version 4.8.2
+ * @version 4.8.6
  * @summary A high-level utility class to simplify and streamline the creation of complex animations using Anime.js.
  * @description This helper abstracts common animation patterns like scroll-triggered reveals, text splitting,
  * timeline orchestration, and element pinning into a declarative, easy-to-use API.
@@ -288,7 +288,7 @@ class AnimeHelper {
     }
 
     const pinElements = target
-      ? trackElement.querySelectorAll(target)
+      ? this._resolveScopedTargets(target, trackElement)
       : [trackElement];
 
     if (!pinElements || pinElements.length === 0) {
@@ -322,6 +322,24 @@ class AnimeHelper {
         trackElement.style.height = duration;
       }
     }
+  }
+
+  /**
+   * Resolves targets (string, array, etc.) but scopes the search to within a parent element.
+   * @param {string|Array|HTMLElement|NodeList} targets - The targets to resolve.
+   * @param {HTMLElement} parent - The parent element to search within.
+   * @returns {Array<HTMLElement>} An array of the found elements.
+   * @private
+   */
+  _resolveScopedTargets(targets, parent) {
+    // If no parent is provided, we default to the global resolver.
+    if (!parent) {
+      return this._resolveTargetsFn(targets);
+    }
+    // First, use the powerful global resolver to handle all input types.
+    const allPossibleTargets = this._resolveTargetsFn(targets);
+    // Then, filter the results to keep only the elements contained within the parent.
+    return allPossibleTargets.filter((el) => parent.contains(el));
   }
 
   /* ========================== CORE METHODS ================================ */
@@ -525,9 +543,7 @@ class AnimeHelper {
     };
 
     const finalAnimationTargets = config.animationTarget
-      ? this._resolveTargetsFn(observerTargets)[0].querySelectorAll(
-          animationTargets
-        )
+      ? this._resolveScopedTargets(animationTargets, observerTarget)
       : this._resolveTargetsFn(animationTargets);
 
     return this._animateFn(finalAnimationTargets, {
@@ -746,7 +762,7 @@ class AnimeHelper {
         const childElements = Array.isArray(step.target)
           ? step.target
           : parentElement
-          ? parentElement.querySelectorAll(step.target)
+          ? this._resolveScopedTargets(step.target, parentElement)
           : this._resolveTargetsFn(step.target);
 
         if (childElements.length > 0) {
