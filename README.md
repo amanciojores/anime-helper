@@ -1,6 +1,6 @@
 # AnimeHelper.js
 
-#### Version: 4.8.2
+#### Version: 4.8.6
 
 A high-level utility class to simplify and streamline the creation of complex, modern animations using Anime.js. This helper abstracts common animation patterns like scroll-triggered reveals, text splitting, timeline orchestration, and element pinning into a declarative, easy-to-use API.
 
@@ -198,29 +198,70 @@ helper.observe(null, {
 
 Create animations that don't play immediately and control them with static methods.
 
-```javasacript
+```javascript
 // 1. Create a reusable animation instance
-helper.observe('.my-interactive-element', {
+helper.observe(".my-interactive-element", {
   reusable: true, // Sets autoplay: false
   params: {
     scale: [1, 1.2],
-    duration: 300
-  }
+    duration: 300,
+  },
 });
-
 // 2. Control it later from anywhere in your code
-const button = document.querySelector('#my-button');
-button.addEventListener('click', () => {
+const button = document.querySelector("#my-button");
+button.addEventListener("click", () => {
   // Use the static .get() method to retrieve and control the instance
-  AnimeHelper.get('.my-interactive-element').restart();
+  AnimeHelper.get(".my-interactive-element").restart();
 });
 ```
 
 - `observe()`also returns animation instance. You can use assign an animation instance to a variable instead of using `get()`
 
-```javasrcipt
+```javascript
 const myInteractiveElement = helper.observe('.my-interactive-element', {...});
 console.log(myInteractiveElement); // Log animation instance
+```
+
+### Creating Custom Presets
+
+You can extend the helper with your own reusable animation presets.
+
+#### 1. Define the Preset
+
+Use the static `addPreset()` method to define your animation. A preset is a function that receives the user's `config` object and must return an anime.js parameter object.
+
+```javascript
+// Define a new 'shake' preset
+AnimeHelper.addPreset("shake", (config) => {
+  // You can read from the user's config to make the preset dynamic
+  const intensity = config.intensity || 10;
+
+  return {
+    translateX: [
+      { value: intensity * -1, duration: 50, easing: "easeInOutQuad" },
+      { value: intensity, duration: 50, easing: "easeInOutQuad" },
+      { value: intensity * -0.5, duration: 50, easing: "easeInOutQuad" },
+      { value: intensity * 0.5, duration: 50, easing: "easeInOutQuad" },
+      { value: 0, duration: 250, easing: "easeOutQuad" },
+    ],
+    duration: 500, // Default duration for the shake
+  };
+});
+```
+
+#### 2. Use the Preset
+
+Now you can use `preset: 'shake'` in any `observe` call. The preset's parameters will be automatically merged, and you can override them in the `params` object.
+
+```javascript
+// Use the custom 'shake' preset
+helper.observe(".form-error", {
+  preset: "shake",
+  intensity: 5, // Pass a custom property to the preset
+  params: {
+    duration: 700, // Override the preset's default duration
+  },
+});
 ```
 
 ## API Reference
@@ -233,30 +274,31 @@ This is the core method for creating all animations.
 - `config` (`Object`): The main configuration object that defines the animation's behavior.
 
 `config` Object Properties
-| Property          | Type      | Description                                                                         |
-| :---              | :----     | :---                                                                                |
-| `type`            | `String`  | Optional. The type of animation to create. Can be `'default' or null or omitted`, `'splitText'`, `'timeline'`, `'scroll'`, `'pin'`. Defaults to `'default'`.        |
-| `pin`             | `Boolean` | If true, enables the pinning feature. This forces the animation to be a `type: 'scroll'` scrubbing animation. |
-| `reusable`        | `Boolean` | If true, creates the animation with autoplay: false, making it a reusable instance that can be controlled manually. |
-| `animationTarget` | `String`  | Optional selector for type: 'scroll'. Specifies the child element(s) to animate while the main targets element is used as the scroll track. (can also use `target` or `targets` inside `pinParams`) |
-| `params`          | `Object`  | The standard [anime.js](https://animejs.com/) parameters for the animation (e.g., `translateX`, `duration`, `easing`). |
-| `scrollParams`    | `Object`  | Configuration for the [anime.js scroll observer](https://animejs.com/documentation/scroll). Adding this to any non-scroll type makes it scroll-triggered.   |
-| `pinParams`       | `Object`  | Configuration for the pinning effect. Used only when `pin: true`. (e.g., `{ duration: '200vh', target: '.sticky-child' }`). `duration` supports relative values.    |
-| `splitParams`     | `Object`  | Configuration for `type: 'splitText'`. (e.g., `{ from: 'bottom', stagger: 50 }`) |
-| `timelineParams`  | `Object`  | Configuration for `type: 'timeline'`. The steps array is the most important property here. |
+| Property | Type | Description |
+| :--- | :---- | :--- |
+| `type` | `String` | Optional. The type of animation to create. Can be `'default' or null or omitted`, `'splitText'`, `'timeline'`, `'scroll'`, `'pin'`. Defaults to `'default'`. |
+| `pin` | `Boolean` | If true, enables the pinning feature. This forces the animation to be a `type: 'scroll'` scrubbing animation. |
+| `reusable` | `Boolean` | If true, creates the animation with autoplay: false, making it a reusable instance that can be controlled manually. |
+| `animationTarget` | `String` | Optional selector for type: 'scroll'. Specifies the child element(s) to animate while the main targets element is used as the scroll track. (can also use `target` or `targets` inside `pinParams`) |
+| `params` | `Object` | The standard [anime.js](https://animejs.com/) parameters for the animation (e.g., `translateX`, `duration`, `easing`). |
+| `scrollParams` | `Object` | Configuration for the [anime.js scroll observer](https://animejs.com/documentation/scroll). Adding this to any non-scroll type makes it scroll-triggered. |
+| `pinParams` | `Object` | Configuration for the pinning effect. Used only when `pin: true`. (e.g., `{ duration: '200vh', target: '.sticky-child' }`). `duration` supports relative values. |
+| `splitParams` | `Object` | Configuration for `type: 'splitText'`. (e.g., `{ from: 'bottom', stagger: 50 }`) |
+| `timelineParams` | `Object` | Configuration for `type: 'timeline'`. The steps array is the most important property here. |
 
 #### Static Control Methods
+
 These methods are called directly on the AnimeHelper class (e.g., AnimeHelper.get(...)) to control named animation instances created with string selectors.
 
-| Method | Description |
-| :--    | :--         |
-| `AnimeHelper.get(selector)`     | Retrieves a stored animation instance by its selector. 
-| `AnimeHelper.getAll()`          | Retrieves the entire Map of all stored instances.
-| `AnimeHelper.play(selector)`    | Plays a specific animation instance.
-| `AnimeHelper.playAll()`         | Plays all stored animation instances.
-| `AnimeHelper.pause(selector)`   | Pauses a specific animation instance.
-| `AnimeHelper.pauseAll()`        | Pauses all stored animation instances.
-| `AnimeHelper.restart(selector)` | Restarts a specific animation instance from the beginning.
-| `AnimeHelper.restartAll()`      | Restarts all stored animation instances.
-| `AnimeHelper.kill(selector)`    | Kills and reverts a specific animation instance, removing its effects.
-| `AnimeHelper.killAll()`         | Kills and reverts all stored animation instances.
+| Method                          | Description                                                            |
+| :------------------------------ | :--------------------------------------------------------------------- |
+| `AnimeHelper.get(selector)`     | Retrieves a stored animation instance by its selector.                 |
+| `AnimeHelper.getAll()`          | Retrieves the entire Map of all stored instances.                      |
+| `AnimeHelper.play(selector)`    | Plays a specific animation instance.                                   |
+| `AnimeHelper.playAll()`         | Plays all stored animation instances.                                  |
+| `AnimeHelper.pause(selector)`   | Pauses a specific animation instance.                                  |
+| `AnimeHelper.pauseAll()`        | Pauses all stored animation instances.                                 |
+| `AnimeHelper.restart(selector)` | Restarts a specific animation instance from the beginning.             |
+| `AnimeHelper.restartAll()`      | Restarts all stored animation instances.                               |
+| `AnimeHelper.kill(selector)`    | Kills and reverts a specific animation instance, removing its effects. |
+| `AnimeHelper.killAll()`         | Kills and reverts all stored animation instances.                      |
